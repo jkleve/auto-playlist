@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: plivo
+  name: plivo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: plivo
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        io.kompose.network/cluster-network: "true"
+        io.kompose.service: plivo
+    spec:
+      containers:
+        - name: plivo
+          image: jkleve/plivo:latest
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          ports:
+            - containerPort: 5002
+          resources: {}
+      restartPolicy: Always
+status: {}

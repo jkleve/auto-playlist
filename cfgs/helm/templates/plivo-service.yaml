@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    io.kompose.service: plivo
+  name: plivo
+spec:
+  ports:
+    - name: "5002"
+      port: 5002
+      targetPort: 5002
+  type: NodePort
+  selector:
+    io.kompose.service: plivo
+status:
+  loadBalancer: {}
