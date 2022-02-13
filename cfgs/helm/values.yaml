@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   registry: jkleve
-  name: playlist-manager
+  name: auto-playlist
   version: latest
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
