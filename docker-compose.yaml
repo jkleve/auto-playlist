@@ -6,17 +6,12 @@ services:
     build: ./playlist_manager
     image: jkleve/auto-playlist:latest
     ports:
-     - "5001:5001"
+     - "8081:8081"
     networks:
      - cluster-network
     environment:
-     - PYTHONUNBUFFERED=1  # @todo turn off if production
-    labels: 
-      kompose.service.type: loadbalancer
-    # @todo use args to set FLASK_ENV=development
-    # environment:
-    #  - NGINX_HOST=foobar.com
-    #  - NGINX_PORT=80
+     - PYTHONUNBUFFERED=1
+     - FLASK_ENV=development
 
   plivo:
     build: ./plivo
@@ -27,8 +22,7 @@ services:
      - cluster-network
     environment:
      - PYTHONUNBUFFERED=1
-    labels: 
-      kompose.service.type: loadbalancer
+     - FLASK_ENV=development
 
 networks:
   cluster-network:

@@ -53,4 +53,8 @@ def health():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
+    if app.debug:
+        app.run(host='localhost', port=8080)
+    else:
+        from waitress import serve
+        serve(app, host='0.0.0.0', port=8080)

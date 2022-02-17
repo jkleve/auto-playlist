@@ -115,4 +115,8 @@ def health():
 
 
 if __name__ == '__main__':
-    print('run: FLASK_APP=main.py FLASK_ENV=development flask run')
+    if app.debug:
+        app.run(host='localhost', port=8080)
+    else:
+        from waitress import serve
+        serve(app, host='0.0.0.0', port=8080)
