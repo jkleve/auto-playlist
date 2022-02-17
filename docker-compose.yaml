@@ -1,6 +1,5 @@
 version: '3.3'
 
-
 services:
   api:
     build: ./playlist_manager
@@ -23,6 +22,14 @@ services:
     environment:
      - PYTHONUNBUFFERED=1
      - FLASK_ENV=development
+
+  redis:
+    image: redis:6.2.6-alpine
+    ports:
+      - '6379:6379'
+    networks:
+      - cluster-network
+
 
 networks:
   cluster-network:

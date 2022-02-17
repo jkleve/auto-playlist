@@ -1,10 +1,13 @@
 from base64 import b64encode
 from flask import Flask, redirect, request, make_response, Response
 from spotify import SpotifyHandler
+from spotify import callback as spotify_callback
+from spotify import login as spotify_login
 from urllib.parse import urlencode, urlparse
-from util.log import log_info, log_error
+from util.log import log_debug, log_info, log_error
 
 import re
+import redis
 import requests
 
 __author__ = 'Jesse Kleve'
@@ -34,7 +37,8 @@ Spotify authorization code flow
 """
 
 app = Flask(__name__)
-config = {
+ctx = {
+    'db': redis.Redis(host='redis', port=6379),
     'spotify': {
         'client_id': 'e92e740411d44d3786c109d845d7d480',
         'client_secret': '7adcb3867bbb4b60b2ea848b5d88aac2',
@@ -69,37 +73,12 @@ def handle_message(message, handlers):
 
 @app.route('/login/', methods=['GET'])
 def login():
-    query_params = {
-        'response_type': 'code',
-        'client_id': config['spotify']['client_id'],
-        'redirect_uri': f'{request.host_url}callback/',
-        'scope': 'playlist-modify-public',
-    }
-    return redirect(f"https://accounts.spotify.com/authorize?{urlencode(query_params)}")
+    return spotify_login(ctx, request)
 
 
 @app.route('/callback/', methods=['GET'])
 def callback():
-    # @todo how slow is it to have this method hang while it sends request to spotify.com?
-    encoded_secrets = b64encode(f'{config["spotify"]["client_id"]}:{config["spotify"]["client_secret"]}'
-        .encode('utf8')).decode('utf8')
-    log_info(f'trying code: {request.args.get("code")}')
-    response = requests.post(
-        'https://accounts.spotify.com/api/token',
-        headers={'Authorization': f'Basic {encoded_secrets}'},
-        data={
-            'grant_type': 'authorization_code',
-            'redirect_uri': f'{request.host_url}callback/',
-            'code': request.args.get('code'),
-        })
-
-    if response.ok:
-        # @todo save access & refresh tokens
-        log_info(f'access_token: {response.json()["access_token"]}')
-    else:
-        log_error(f'{response.status_code}: {response.text}')
-
-    return ''
+    return spotify_callback(ctx, request)
 
 
 @app.route('/messages/', methods=['POST'])
@@ -114,9 +93,14 @@ def health():
     return 'ok'
 
 
-if __name__ == '__main__':
+def main():
+    # @todo port = os.getenv('pl_port')
     if app.debug:
         app.run(host='localhost', port=8080)
     else:
         from waitress import serve
         serve(app, host='0.0.0.0', port=8080)
+
+
+if __name__ == '__main__':
+    main()

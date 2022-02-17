@@ -1,9 +1,15 @@
+import json
 import os
 import re
+import redis
 import requests
+from base64 import b64encode
 from collections import namedtuple
+from datetime import datetime, timedelta
+from flask import Flask, redirect, request, make_response, Response
+from urllib.parse import urlencode, urlparse
 from urllib.parse import ParseResult
-from util.log import log_info, log_error
+from util.log import log_debug, log_info, log_error
 
 Url = namedtuple('Url', 'host path')
 
@@ -24,6 +30,91 @@ def get_track_id(url):
 def get_playlist_id():
     """Get from enviornment for now"""
     return os.getenv('SPOTIFY_PLAYLIST_ID')
+
+
+def login(ctx, request):
+    query_params = {
+        'response_type': 'code',
+        'client_id': ctx['spotify']['client_id'],
+        'redirect_uri': f'{request.host_url}callback/',
+        'scope': 'playlist-modify-public',
+    }
+    return redirect(f"https://accounts.spotify.com/authorize?{urlencode(query_params)}")
+
+
+def encode_secrets(client_id, client_secret):
+    return b64encode(f'{client_id}:{client_secret}'.encode('utf8')).decode('utf8')
+
+
+def callback(ctx):
+    # @todo how slow is it to have this method hang while it sends request to spotify.com?
+    log_info(f'trying code: {request.args.get("code")}')
+
+    response = requests.post('https://accounts.spotify.com/api/token',
+        headers={'Authorization': f'Basic {encode_secrets(ctx["client_id"], ctx["client_secret"])}'},
+        data={
+            'grant_type': 'authorization_code',
+            'redirect_uri': f'{request.host_url}callback/',
+            'code': request.args.get('code'),
+        })
+
+    if response.ok:
+        token = response.json()['access_token']
+        ctx['db'].set('access_token', token)
+        ctx['db'].set('refresh_token', response.json()['refresh_token'])
+        log_debug(f'access_token: {token}')
+        log_debug(f'access_token: {token}')
+    else:
+        log_error(f'{response.status_code}: {response.text}')
+
+    return ''
+
+
+class OAuthMgr(object):
+    """Manages the OAuth for Spotify"""
+    def __init__(self, ctx):
+        self.ctx = ctx
+
+        self.access = self._load_access()
+        self.refreshed_at = None
+
+        self.refresh_session()
+
+    @property
+    def access_token(self):
+        return self.access["access_token"]
+
+    def is_expired(self):
+        """Checks if the time now is greater than the token's expiration time plus 60 seconds of buffer"""
+        return datetime.utcnow() > self.refreshed_at + timedelta(seconds=self.access["expires_in"] + 60)
+
+    def _load_access(self):
+        return dict(
+            access_token=self.db.get('access_token'),
+            refresh_token=self.db.get('refresh_token'),
+        )
+
+    def _save_access(self):
+        self.db.set('access_token', self.access['access_token'])
+        self.db.set('refresh_token', self.access['refresh_token'])
+
+    def refresh_session(self):
+        log_debug('refreshing access token')
+
+        response = requests.post('https://accounts.spotify.com/api/token',
+            headers={'Authorization': f'Basic {encode_secrets(self.ctx["client_id"], self.ctx["client_secret"])}'},
+            data={
+                'grant_type': 'refresh_token',
+                'refresh_token': self.access['refresh_token'],
+            })
+
+        if response.status_code == requests.codes.ok:
+            log_debug('got new access token')
+            self.access.update(json.loads(response.text))
+            self.refreshed_at = datetime.utcnow()
+            self._save_access()
+        else:
+            log_error(f'failed to refresh access token: {response.text}')
 
 
 class SpotifyHandler(object):
