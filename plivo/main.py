@@ -1,7 +1,6 @@
 from flask import Flask, request, make_response, Response
 from plivo import plivoxml
 import requests
-import sys
 
 __author__ = 'Jesse Kleve'
 __version__ = '0.1.0'

@@ -11,6 +11,29 @@ from urllib.parse import urlencode, urlparse
 from urllib.parse import ParseResult
 from util.log import log_debug, log_info, log_error
 
+"""
+Spotify authorization code flow
+
+ 1. need to redirect the user to 
+   GET https://accounts.spotify.com/api/authorize
+     query parameters:
+       response_type=code
+       client_id=<client id>
+       redirect_uri=http://<this host>/callback/
+       scope='playlist-modify-public'
+
+ 2. need to capture the 'code' paramter on /callback/ route
+
+ 3. with the code, make the next request
+   POST https://accounts.spotify.com/api/token
+     data:
+       grant_type=authorization_code
+       redirect_uri=http://<this host>:5000
+       code=<code>
+
+ 4. response has access_token and refresh_token
+"""
+
 Url = namedtuple('Url', 'host path')
 
 
@@ -18,13 +41,13 @@ def convert(url: ParseResult) -> Url:
     return Url(url.netloc, url.path)
 
 
-def get_track_id(url):
+def get_track_id(path):
     """Get base-62 encoded track ID"""
-    m = re.search('/track/(?P<track_id>[a-zA-Z0-9]+)$', url.path)
+    m = re.search('/track/(?P<track_id>[a-zA-Z0-9]+)$', path)
     try:
         return m.group('track_id')
     except (AttributeError, IndexError):
-        log_info(f'{url.path} does not appear to be a spotify track')
+        log_info(f'{path} does not appear to be a spotify track')
 
 
 def get_playlist_id():
@@ -138,7 +161,7 @@ class SpotifyHandler(object):
             #
             # if self.oauth.is_expired():
             #     self.oauth.refresh_session()
-            if track_id := self.get_track_id(url):
+            if track_id := self.get_track_id(url.path):
                 self.add(get_playlist_id(), f'spotify:track:{track_id}')
 
 
